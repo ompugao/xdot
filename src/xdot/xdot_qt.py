@@ -36,6 +36,10 @@ import re
 #from PyQt4 import *
 #from PyQt4.QtCore import *
 #from PyQt4.QtGui import *
+#from PyQt5 import *
+#from PyQt5.QtCore import *
+#from PyQt5.QtGui import *
+#from PyQt5.QtWidgets import *
 from python_qt_binding.QtGui import QPalette, QColor, QFont, QFontMetrics, QPen, QBrush, QPolygonF, QPainterPath, QPainter, QKeySequence, QIcon, QMouseEvent
 from python_qt_binding.QtCore import Qt, QPoint, QPointF, QTimer, QSettings, QVariant, QSize, QFileInfo
 
@@ -1143,8 +1147,11 @@ class Animation(object):
         self.timeout_id = None
 
     def start(self):
-        self.timeout_id = QTimer();
-        self.dot_widget.connect(self.timeout_id, SIGNAL('timeout()'), self.tick)
+        self.timeout_id = QTimer()
+        if get_qt_version() == 4:
+            self.dot_widget.connect(self.timeout_id, SIGNAL('timeout()'), self.tick)
+        else:
+            self.timeout_id.timeout.connect(self.tick)
         self.timeout_id.start(int(self.step * 1000))
 
     def stop(self):
@@ -1764,7 +1771,10 @@ class DotWindow(QMainWindow):
 
         self.file_menu = self.menuBar().addMenu("&File")
         self.file_menu_actions = (file_open_action, file_reload_action)
-        self.connect(self.file_menu, SIGNAL("aboutToShow()"), self.update_file_menu)
+        if get_qt_version() == 4:
+            self.connect(self.file_menu, SIGNAL("aboutToShow()"), self.update_file_menu)
+        else:
+            self.file_menu.triggered.connect(self.update_file_menu)
 
         file_toolbar = self.addToolBar("File")
         file_toolbar.setObjectName("FileToolBar")
@@ -1797,7 +1807,10 @@ class DotWindow(QMainWindow):
             action.setToolTip(tip)
             action.setStatusTip(tip)
         if slot is not None:
-            self.connect(action, SIGNAL(signal), slot)
+            if get_qt_version() == 4:
+                self.connect(action, SIGNAL(signal), slot)
+            else:
+                action.triggered.connect(slot)
         if checkable:
             action.setCheckable(True)
         return action
