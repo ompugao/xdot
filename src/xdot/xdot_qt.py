@@ -33,10 +33,22 @@ import re
 
 #from PySide.QtCore import *
 #from PySide.QtGui import *
-from PyQt4 import *
-from PyQt4.QtCore import *
-from PyQt4.QtGui import *
+#from PyQt4 import *
+#from PyQt4.QtCore import *
+#from PyQt4.QtGui import *
+from python_qt_binding.QtGui import QPalette, QColor, QFont, QFontMetrics, QPen, QBrush, QPolygonF, QPainterPath, QPainter, QKeySequence, QIcon, QMouseEvent
+from python_qt_binding.QtCore import Qt, QPoint, QPointF, QTimer, QSettings, QVariant, QSize, QFileInfo
 
+from qt_utils import get_qt_version, mouseevent_wrapper, wheelevent_wrapper
+g_PYQT_MAJOR_VERSION = get_qt_version()
+if g_PYQT_MAJOR_VERSION == 4:
+    from python_qt_binding.QtGui import QWidget, QMainWindow, QApplication, QAction, QFileDialog
+    from python_qt_binding.QtCore import QString, SIGNAL
+elif g_PYQT_MAJOR_VERSION == 5:
+    from python_qt_binding.QtWidgets import QWidget, QMainWindow, QApplication, QAction, QFileDialog
+    QString = type("")
+    from python_qt_binding import QtCore
+    SIGNAL = QtCore.Signal #XXX should be fixed
 #from python_qt_binding import  *
 #from python_qt_binding.QtCore import  *
 #from python_qt_binding.QtGui import  *
@@ -1338,6 +1350,9 @@ class DotWidget(QWidget):
     """Qt widget that draws dot graphs."""
 
     filter = 'dot'
+    if get_qt_version() == 5:
+        sig_clicked = QtCore.Signal(unicode, QMouseEvent)
+        sig_rightclicked = QtCore.Signal(unicode, QMouseEvent)
 
     def __init__(self,  parent=None):
         super(DotWidget,  self).__init__(parent)
@@ -1634,9 +1649,15 @@ class DotWidget(QWidget):
             x, y = event.x(), event.y()
             url = self.get_url(x, y)
             if url is not None:
-                self.emit(SIGNAL("clicked"), unicode(url.url), event)
+                if get_qt_version() == 4:
+                    self.emit(SIGNAL("clicked"), unicode(url.url), event)
+                else:
+                    self.sig_clicked.emit(unicode(url.url), event)
             else:
-                self.emit(SIGNAL("clicked"), 'none', event)
+                if get_qt_version() == 4:
+                    self.emit(SIGNAL("clicked"), 'none', event)
+                else:
+                    self.sig_clicked.emit(unicode('none'), event)
                 jump = self.get_jump(x, y)
                 if jump is not None:
                     self.animate_to(jump.x, jump.y)
@@ -1647,9 +1668,15 @@ class DotWidget(QWidget):
             x, y = event.x(), event.y()
             url = self.get_url(x, y)
             if url is not None:
-                self.emit(SIGNAL("right_clicked"), unicode(url.url), event)
+                if get_qt_version() == 4:
+                    self.emit(SIGNAL("right_clicked"), unicode(url.url), event)
+                else:
+                    self.sig_rightclicked.emit(unicode(url.url), event)
             else:
-                self.emit(SIGNAL("right_clicked"), 'none', event)
+                if get_qt_version():
+                    self.emit(SIGNAL("right_clicked"), 'none', event)
+                else:
+                    self.sig_rightclicked.emit(unicode('none'), event)
                 jump = self.get_jump(x, y)
                 if jump is not None:
                     self.animate_to(jump.x, jump.y)
@@ -1661,6 +1688,7 @@ class DotWidget(QWidget):
     def on_area_scroll_event(self, area, event):
         return False
 
+    @wheelevent_wrapper
     def wheelEvent(self, event):
         if event.delta() > 0:
             self.zoom_image(self.zoom_ratio * self.ZOOM_INCREMENT,
@@ -1669,6 +1697,7 @@ class DotWidget(QWidget):
             self.zoom_image(self.zoom_ratio / self.ZOOM_INCREMENT,
                             pos=(event.x(), event.y()))
 
+    @mouseevent_wrapper
     def mouseMoveEvent(self, event):
         self.drag_action.on_motion_notify(event)
         self.setFocus()
@@ -1704,7 +1733,6 @@ class DotWidget(QWidget):
 
 
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------------
-#class DotWindow(gtk.Window):
 class DotWindow(QMainWindow):
 
     def __init__(self):
@@ -1848,7 +1876,12 @@ class DotWindow(QMainWindow):
             for i, fname in enumerate(recent_files):
                 action = QAction(QIcon(":/icon.png"), "&%d %s" % (i + 1, QFileInfo(fname).fileName()), self)
                 action.setData(QVariant(fname))
-                self.connect(action, SIGNAL("triggered()"), self.open_file)
+                if get_qt_version() == 4:
+                    self.connect(action, SIGNAL("triggered()"), self.open_file)
+                elif get_qt_version() == 5:
+                    action.triggered.connect(self.open_file)
+                else:
+                    print("WARN: not supported qt version")
                 self.file_menu.addAction(action)
         self.file_menu.addSeparator()
         self.file_menu.addAction(self.file_menu_actions[-1])
